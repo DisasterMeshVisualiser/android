@@ -1,8 +1,10 @@
 package jp.ac.dendai.im.cps.sipmesh4android.activities;
 
 import android.content.Context;
+import android.graphics.Color;
 import android.location.Location;
 import android.location.LocationManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.support.design.widget.FloatingActionButton;
@@ -14,20 +16,23 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.android.gms.appindexing.Action;
+import com.google.android.gms.appindexing.AppIndex;
+import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.PolygonOptions;
 import com.google.maps.android.geojson.GeoJsonFeature;
 import com.google.maps.android.geojson.GeoJsonLayer;
 import com.google.maps.android.geojson.GeoJsonPolygonStyle;
 
-import org.json.JSONException;
-import org.json.JSONObject;
-
 import java.io.IOException;
 
+import jp.ac.dendai.im.cps.sipmesh4android.entities.Mesh;
 import jp.ac.dendai.im.cps.sipmesh4android.R;
 import jp.ac.dendai.im.cps.sipmesh4android.network.ApiClient;
 import okhttp3.Call;
@@ -42,6 +47,11 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private View rootView;
     private Handler handler = new Handler();
+    /**
+     * ATTENTION: This was auto-generated to implement the App Indexing API.
+     * See https://g.co/AppIndexing/AndroidStudio for more information.
+     */
+    private GoogleApiClient client2;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -64,6 +74,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
+        // ATTENTION: This was auto-generated to implement the App Indexing API.
+        // See https://g.co/AppIndexing/AndroidStudio for more information.
+        client2 = new GoogleApiClient.Builder(this).addApi(AppIndex.API).build();
     }
 
     @Override
@@ -78,12 +91,11 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         LocationManager locationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
         Location myLocate = locationManager.getLastKnownLocation("gps");
         LatLng latlng;
-        if(myLocate != null){
+        if (myLocate != null) {
             Snackbar.make(rootView, "「ゆれやすさ」を取得中・・・", Snackbar.LENGTH_LONG).show();
 //            Toast.makeText(this, "「ゆれやすさ」を取得中・・・", Toast.LENGTH_SHORT).show();
             latlng = new LatLng(myLocate.getLatitude(), myLocate.getLongitude());
-        }
-        else {
+        } else {
             Snackbar.make(rootView, "現在地を取得できませんでした", Snackbar.LENGTH_LONG).show();
 //            Toast.makeText(this, "現在地を取得できませんでした", Toast.LENGTH_SHORT ).show();
             latlng = new LatLng(35.749882, 139.804975);
@@ -91,41 +103,63 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latlng, 13));
 
-        ApiClient client = new ApiClient() {
+        ApiClient testClient = new ApiClient() {
             @Override
             public void onFailure(Call call, IOException e) {
-                Log.e(TAG, "onFailure", e.fillInStackTrace());
+                Log.d(TAG, "onFailure: test client");
             }
 
             @Override
             public void onResponse(Call call, Response response) throws IOException {
-                final String responseCode = response.body().string();
-                Log.d(TAG, "onPostCompleted: ok");
-                Log.d(TAG, responseCode);
+                String str = response.body().string();
+                final Mesh mesh = new ObjectMapper().readValue(str, Mesh.class);
+                Log.d(TAG, "onResponse: " + mesh.toString());
 
-                JSONObject jsonObject = null;
-                try {
-                    jsonObject = new JSONObject(responseCode);
-                } catch (JSONException e) {
-                    e.printStackTrace();
-                }
-
-                if (jsonObject != null) {
-                    final JSONObject finalJsonObject = jsonObject;
-                    handler.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            mLayer = new GeoJsonLayer(mMap, finalJsonObject);
-
-                            addPolygons(mLayer);
-                            mLayer.addLayerToMap();
-                        }
-                    });
-                }
+                handler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        addPolyline(mesh);
+                    }
+                });
             }
         };
+        testClient.getCpsMesh(1);
 
-        client.getGeoJson4JSHIS(latlng);
+//        ApiClient client = new ApiClient() {
+//            @Override
+//            public void onFailure(Call call, IOException e) {
+//                Log.e(TAG, "onFailure", e.fillInStackTrace());
+//            }
+//
+//            @Override
+//            public void onResponse(Call call, Response response) throws IOException {
+//                final String responseCode = response.body().string();
+//                Log.d(TAG, "onPostCompleted: ok");
+//                Log.d(TAG, responseCode);
+//
+//                JSONObject jsonObject = null;
+//                try {
+//                    jsonObject = new JSONObject(responseCode);
+//                } catch (JSONException e) {
+//                    e.printStackTrace();
+//                }
+//
+//                if (jsonObject != null) {
+//                    final JSONObject finalJsonObject = jsonObject;
+//                    handler.post(new Runnable() {
+//                        @Override
+//                        public void run() {
+//                            mLayer = new GeoJsonLayer(mMap, finalJsonObject);
+//
+//                            addPolygons(mLayer);
+//                            mLayer.addLayerToMap();
+//                        }
+//                    });
+//                }
+//            }
+//        };
+//
+//        client.getGeoJson4JSHIS(latlng);
     }
 
     private static int arvToColor(double ARV) {
@@ -135,10 +169,26 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             return 0x44ffff00;
         } else if (1.6 < ARV) {
             return 0x4400ff00;
-        } else if (1.2 < ARV){
+        } else if (1.2 < ARV) {
             return 0x440000ff;
         }
         return 0;
+    }
+
+    private void addPolyline(Mesh mesh) {
+        for (Mesh.MeshData data : mesh.getData()) {
+            double[][] coordinates = data.getCoordinates();
+            PolygonOptions rectOptions = new PolygonOptions();
+            rectOptions
+                    .add(new LatLng(coordinates[0][0],coordinates[0][1]),
+                        new LatLng(coordinates[1][0],coordinates[1][1]),
+                        new LatLng(coordinates[2][0],coordinates[2][1]),
+                        new LatLng(coordinates[3][0],coordinates[3][1]),
+                        new LatLng(coordinates[4][0],coordinates[4][1]))
+                    .fillColor(Color.argb((int)(25 * (data.getValue() * 20)), 255, 0, 0))
+                    .strokeWidth(1.0f);
+            mMap.addPolygon(rectOptions);
+        }
     }
 
     private void addPolygons(GeoJsonLayer layer) {
@@ -177,5 +227,45 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
 
         return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+
+        // ATTENTION: This was auto-generated to implement the App Indexing API.
+        // See https://g.co/AppIndexing/AndroidStudio for more information.
+        client2.connect();
+        Action viewAction = Action.newAction(
+                Action.TYPE_VIEW, // TODO: choose an action type.
+                "Main Page", // TODO: Define a title for the content shown.
+                // TODO: If you have web page content that matches this app activity's content,
+                // make sure this auto-generated web page URL is correct.
+                // Otherwise, set the URL to null.
+                Uri.parse("http://host/path"),
+                // TODO: Make sure this auto-generated app deep link URI is correct.
+                Uri.parse("android-app://jp.ac.dendai.im.cps.sipmesh4android/http/host/path")
+        );
+        AppIndex.AppIndexApi.start(client2, viewAction);
+    }
+
+    @Override
+    public void onStop() {
+        super.onStop();
+
+        // ATTENTION: This was auto-generated to implement the App Indexing API.
+        // See https://g.co/AppIndexing/AndroidStudio for more information.
+        Action viewAction = Action.newAction(
+                Action.TYPE_VIEW, // TODO: choose an action type.
+                "Main Page", // TODO: Define a title for the content shown.
+                // TODO: If you have web page content that matches this app activity's content,
+                // make sure this auto-generated web page URL is correct.
+                // Otherwise, set the URL to null.
+                Uri.parse("http://host/path"),
+                // TODO: Make sure this auto-generated app deep link URI is correct.
+                Uri.parse("android-app://jp.ac.dendai.im.cps.sipmesh4android/http/host/path")
+        );
+        AppIndex.AppIndexApi.end(client2, viewAction);
+        client2.disconnect();
     }
 }

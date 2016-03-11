@@ -45,6 +45,17 @@ public abstract class ApiClient {
         enqueue(builder);
     }
 
+    public void getCpsMeshType() {
+        HttpUrl.Builder builder = UrlBuilder.buildCpsMeshTypeUrl();
+        enqueue(builder);
+    }
+
+    public void getCpsMesh(int mesh_type) {
+        HttpUrl.Builder builder = UrlBuilder.buildCpsMeshUrl();
+        builder.addQueryParameter("mesh_type", String.valueOf(mesh_type));
+        enqueue(builder);
+    }
+
     private void enqueue(HttpUrl.Builder builder) {
         request = new Request.Builder()
                 .url(builder.build())
