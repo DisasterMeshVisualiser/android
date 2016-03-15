@@ -8,13 +8,13 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.support.design.widget.FloatingActionButton;
-import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.Toast;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.android.gms.appindexing.Action;
@@ -32,13 +32,19 @@ import com.google.maps.android.geojson.GeoJsonPolygonStyle;
 
 import java.io.IOException;
 
-import jp.ac.dendai.im.cps.sipmesh4android.entities.Mesh;
 import jp.ac.dendai.im.cps.sipmesh4android.R;
+import jp.ac.dendai.im.cps.sipmesh4android.dialogs.CheckBoxDialog;
+import jp.ac.dendai.im.cps.sipmesh4android.dialogs.SpinningProgressDialog;
+import jp.ac.dendai.im.cps.sipmesh4android.entities.Mesh;
+import jp.ac.dendai.im.cps.sipmesh4android.entities.MeshType;
 import jp.ac.dendai.im.cps.sipmesh4android.network.ApiClient;
+import jp.ac.dendai.im.cps.sipmesh4android.utils.SharedPreferencesUtil;
 import okhttp3.Call;
 import okhttp3.Response;
+import rx.Observable;
+import rx.functions.Func3;
 
-public class MainActivity extends AppCompatActivity implements OnMapReadyCallback {
+public class MainActivity extends AppCompatActivity implements OnMapReadyCallback, CheckBoxDialog.OnButtonClickListener {
 
     private static final String TAG = MainActivity.class.getSimpleName();
 
@@ -53,6 +59,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
      */
     private GoogleApiClient client2;
 
+    private static final String CHECK_BOX_DIALOG = "check_box_dialog";
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -65,8 +73,11 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-                        .setAction("Action", null).show();
+//                Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
+//                        .setAction("Action", null).show();
+//                Fragment current = getSupportFragmentManager().findFragmentById(R.id.map);
+//                getSupportFragmentManager().beginTransaction().remove(crrent).add(R.id.map, MeshTypeSelectFragment.newInstance(1)).commit();
+                setMeshType();
             }
         });
 
@@ -77,6 +88,34 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         // ATTENTION: This was auto-generated to implement the App Indexing API.
         // See https://g.co/AppIndexing/AndroidStudio for more information.
         client2 = new GoogleApiClient.Builder(this).addApi(AppIndex.API).build();
+    }
+
+    private void setMeshType() {
+        final Context context = this;
+        ApiClient client = new ApiClient() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                Log.d(TAG, "onFailure: setMeshType");
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                String str = response.body().string();
+                MeshType meshType = new ObjectMapper().readValue(str, MeshType.class);
+                int[] idList = new int[meshType.getData().size()];
+
+                int c = 0;
+                for (MeshType.MeshTypeData data : meshType.getData()) {
+                    SharedPreferencesUtil.putName(data.getId(), data.getName(), context);
+                    SharedPreferencesUtil.putBool(data.getId(), SharedPreferencesUtil.getBool(data.getId(), context), context);
+                    idList[c] = data.getId();
+                    c++;
+                }
+
+                CheckBoxDialog.newInstance(idList).show(getSupportFragmentManager(), CHECK_BOX_DIALOG);
+            }
+        };
+        client.getCpsMeshType();
     }
 
     @Override
@@ -91,22 +130,26 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         LocationManager locationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
         Location myLocate = locationManager.getLastKnownLocation("gps");
         LatLng latlng;
+        SpinningProgressDialog dialog = null;
         if (myLocate != null) {
-            Snackbar.make(rootView, "「ゆれやすさ」を取得中・・・", Snackbar.LENGTH_LONG).show();
-//            Toast.makeText(this, "「ゆれやすさ」を取得中・・・", Toast.LENGTH_SHORT).show();
+            dialog = SpinningProgressDialog.newInstance(TAG, "「ゆれやすさ」を取得中・・・");
+            dialog.show(getSupportFragmentManager(), "dialog_spinner");
             latlng = new LatLng(myLocate.getLatitude(), myLocate.getLongitude());
         } else {
-            Snackbar.make(rootView, "現在地を取得できませんでした", Snackbar.LENGTH_LONG).show();
-//            Toast.makeText(this, "現在地を取得できませんでした", Toast.LENGTH_SHORT ).show();
+            Toast.makeText(this, "現在地を取得できませんでした", Toast.LENGTH_SHORT).show();
             latlng = new LatLng(35.749882, 139.804975);
         }
 
         mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latlng, 13));
 
+        final SpinningProgressDialog finalDialog = dialog;
         ApiClient testClient = new ApiClient() {
             @Override
             public void onFailure(Call call, IOException e) {
                 Log.d(TAG, "onFailure: test client");
+                if (finalDialog != null) {
+                    finalDialog.dismiss();
+                }
             }
 
             @Override
@@ -114,6 +157,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 String str = response.body().string();
                 final Mesh mesh = new ObjectMapper().readValue(str, Mesh.class);
                 Log.d(TAG, "onResponse: " + mesh.toString());
+                if (finalDialog != null) {
+                    finalDialog.dismiss();
+                }
 
                 handler.post(new Runnable() {
                     @Override
@@ -267,5 +313,35 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         );
         AppIndex.AppIndexApi.end(client2, viewAction);
         client2.disconnect();
+    }
+
+    @Override
+    public void onPositiveClick(int[] dataArray, boolean[] boolArray) {
+//        ApiClient client = new ApiClient() {
+//            @Override
+//            public void onFailure(Call call, IOException e) {
+//            }
+//
+//            @Override
+//            public void onResponse(Call call, Response response) throws IOException {
+//            }
+//        };
+//
+//        Observable.combineLatest(
+//                Observable.just(1),
+//                Observable.just(1),
+//                Observable.just(1),
+//                new Func3<Integer, Integer, Integer, Boolean>() {
+//                    @Override
+//                    public Boolean call(Integer integer, Integer integer2, Integer integer3) {
+//                        return false;
+//                    }
+//                }
+//        );
+    }
+
+    @Override
+    public void onNegativeClick() {
+
     }
 }

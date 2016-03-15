@@ -24,6 +24,7 @@ public class MeshType {
         private int id;
         private String name;
         private String label;
+        private boolean isChecked;
 
         public int getId() {
             return id;
@@ -49,12 +50,21 @@ public class MeshType {
             this.label = label;
         }
 
+        public boolean isChecked() {
+            return isChecked;
+        }
+
+        public void setIsChecked(boolean isChecked) {
+            this.isChecked = isChecked;
+        }
+
         @Override
         public String toString() {
             return "MeshTypeData{" +
                     "id=" + id +
                     ", name='" + name + '\'' +
                     ", label='" + label + '\'' +
+                    ", isChecked=" + isChecked +
                     '}';
         }
     }

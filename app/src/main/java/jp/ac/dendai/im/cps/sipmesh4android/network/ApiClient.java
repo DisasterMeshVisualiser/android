@@ -14,6 +14,8 @@ import okhttp3.HttpUrl;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
+import rx.Observable;
+import rx.Subscriber;
 
 public abstract class ApiClient {
 
@@ -56,6 +58,17 @@ public abstract class ApiClient {
         enqueue(builder);
     }
 
+    public Observable<Response> getCpsMeshType4Rx() throws IOException {
+        HttpUrl.Builder builder = UrlBuilder.buildCpsMeshTypeUrl();
+        return enqueue4Rx(builder);
+    }
+
+    public Observable<Response> getCpsMesh4Rx(int mesh_type) throws IOException {
+        HttpUrl.Builder builder = UrlBuilder.buildCpsMeshUrl();
+        builder.addQueryParameter("mesh_type", String.valueOf(mesh_type));
+        return enqueue4Rx(builder);
+    }
+
     private void enqueue(HttpUrl.Builder builder) {
         request = new Request.Builder()
                 .url(builder.build())
@@ -77,8 +90,34 @@ public abstract class ApiClient {
         });
     }
 
-    public abstract void onFailure(Call call, IOException e);
+    private Observable<Response> enqueue4Rx(HttpUrl.Builder builder) throws IOException {
+        request = new Request.Builder()
+                .url(builder.build())
+                .get().build();
 
+        request.url().toString();
+        Log.d(TAG, "enqueue: " + request.url().toString());
+
+        return Observable.create(new Observable.OnSubscribe<Response>() {
+            @Override
+            public void call(final Subscriber<? super Response> subscriber) {
+                client.newCall(request).enqueue(new Callback() {
+                    @Override
+                    public void onFailure(Call call, IOException e) {
+                        subscriber.onError(e.fillInStackTrace());
+                    }
+
+                    @Override
+                    public void onResponse(Call call, Response response) throws IOException {
+                        subscriber.onNext(response);
+                        subscriber.onCompleted();
+                    }
+                });
+            }
+        });
+    }
+
+    public abstract void onFailure(Call call, IOException e);
     public abstract void onResponse(Call call ,Response response) throws IOException;
 
 }
