@@ -317,27 +317,27 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     @Override
     public void onPositiveClick(int[] dataArray, boolean[] boolArray) {
-//        ApiClient client = new ApiClient() {
-//            @Override
-//            public void onFailure(Call call, IOException e) {
-//            }
-//
-//            @Override
-//            public void onResponse(Call call, Response response) throws IOException {
-//            }
-//        };
-//
-//        Observable.combineLatest(
-//                Observable.just(1),
-//                Observable.just(1),
-//                Observable.just(1),
-//                new Func3<Integer, Integer, Integer, Boolean>() {
-//                    @Override
-//                    public Boolean call(Integer integer, Integer integer2, Integer integer3) {
-//                        return false;
-//                    }
-//                }
-//        );
+        ApiClient client = new ApiClient() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+            }
+        };
+
+        Observable.combineLatest(
+                Observable.just(1),
+                Observable.just(1),
+                Observable.just(1),
+                new Func3<Integer, Integer, Integer, Boolean>() {
+                    @Override
+                    public Boolean call(Integer integer, Integer integer2, Integer integer3) {
+                        return false;
+                    }
+                }
+        );
     }
 
     @Override
