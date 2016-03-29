@@ -24,6 +24,7 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.UiSettings;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.PolygonOptions;
 import com.google.maps.android.geojson.GeoJsonFeature;
@@ -55,7 +56,7 @@ import rx.schedulers.Schedulers;
 import rx.subjects.BehaviorSubject;
 
 //public class MainActivity extends AppCompatActivity implements OnMapReadyCallback, CheckBoxDialog.OnButtonClickListener {
-public class MainActivity extends AppCompatActivity implements OnMapReadyCallback, CheckBoxDialog.OnButtonClickListener {
+public class MainActivity extends AppCompatActivity implements OnMapReadyCallback, CheckBoxDialog.OnButtonClickListener, Toolbar.OnMenuItemClickListener {
 
     private static final String TAG = MainActivity.class.getSimpleName();
     private final BehaviorSubject<ActivityEvent> lifecycle = BehaviorSubject.create();
@@ -73,93 +74,54 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private static final String CHECK_BOX_DIALOG = "check_box_dialog";
 
-    private ApiClient apiClient = new ApiClient();
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         lifecycle.onNext(ActivityEvent.CREATE);
         setContentView(R.layout.activity_main);
-        Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
-        setSupportActionBar(toolbar);
         rootView = findViewById(R.id.root_view);
 
-        FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
-        fab.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-//                Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-//                        .setAction("Action", null).show();
-//                Fragment current = getSupportFragmentManager().findFragmentById(R.id.map);
-//                getSupportFragmentManager().beginTransaction().remove(crrent).add(R.id.map, MeshTypeSelectFragment.newInstance(1)).commit();
-                setMeshType();
-            }
-        });
+        Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+//        setSupportActionBar(toolbar);
+        toolbar.setTitle(getString(R.string.app_name));
+        toolbar.setNavigationIcon(R.drawable.icon_48dp);
+        toolbar.inflateMenu(R.menu.menu_main);
+        toolbar.setOnMenuItemClickListener(this);
 
-        // Obtain the SupportMapFragment and get notified when the map is ready to be used.
-        SupportMapFragment mapFragment =
-                (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
+//        FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
+//        fab.setOnClickListener(new View.OnClickListener() {
+//            @Override
+//            public void onClick(View view) {
+//                setMeshType();
+//            }
+//        });
+
+        SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
-        // ATTENTION: This was auto-generated to implement the App Indexing API.
-        // See https://g.co/AppIndexing/AndroidStudio for more information.
         client2 = new GoogleApiClient.Builder(this).addApi(AppIndex.API).build();
-    }
-
-    private void setMeshType() {
-        final Context context = this;
-        apiClient.getCpsMeshType4Rx()
-                .subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(new Subscriber<Response>() {
-                    @Override
-                    public void onCompleted() {
-
-                    }
-
-                    @Override
-                    public void onError(Throwable e) {
-                        Log.e(TAG, "onError: ", e.fillInStackTrace());
-                    }
-
-                    @Override
-                    public void onNext(Response response) {
-                        String str = null;
-                        try {
-                            str = response.body().string();
-                            MeshType meshType = new ObjectMapper().readValue(str, MeshType.class);
-                            int[] idList = new int[meshType.getData().size()];
-
-                            int c = 0;
-                            for (MeshType.MeshTypeData data : meshType.getData()) {
-                                SharedPreferencesUtil.putName(data.getId(), data.getName(), context);
-                                SharedPreferencesUtil.putBool(data.getId(), SharedPreferencesUtil.getBool(data.getId(), context), context);
-                                idList[c] = data.getId();
-                                c++;
-                            }
-                            CheckBoxDialog.newInstance(idList).show(getSupportFragmentManager(), CHECK_BOX_DIALOG);
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-
-                    }
-                });
     }
 
     @Override
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
-
-        // Add a marker in Sydney and move the camera
-//        LatLng sydney = new LatLng(-34, 151);
-//        mMap.addMarker(new MarkerOptions().position(sydney).title("Marker in Sydney"));
-//        mMap.moveCamera(CameraUpdateFactory.newLatLng(sydney));
+        mMap.setMyLocationEnabled(true);
+        mMap.setOnMyLocationChangeListener(new GoogleMap.OnMyLocationChangeListener() {
+            @Override
+            public void onMyLocationChange(Location location) {
+                if (mMap != null) {
+                    LatLng current = new LatLng(location.getLatitude(), location.getLongitude());
+                    mMap.animateCamera(CameraUpdateFactory.newLatLng(current));
+                }
+            }
+        });
+        mMap.getUiSettings().setZoomControlsEnabled(true);
 
         LocationManager locationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
         Location myLocate = locationManager.getLastKnownLocation("gps");
         LatLng latlng;
         SpinningProgressDialog dialog = null;
         if (myLocate != null) {
-            dialog = SpinningProgressDialog.newInstance(TAG, "loading...");
+            dialog = SpinningProgressDialog.newInstance(getString(R.string.app_name), "loading...");
             dialog.show(getSupportFragmentManager(), "dialog_spinner");
             latlng = new LatLng(myLocate.getLatitude(), myLocate.getLongitude());
         } else {
@@ -170,6 +132,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latlng, 13));
 
         final SpinningProgressDialog finalDialog = dialog;
+        ApiClient apiClient = new ApiClient();
         apiClient.getCpsMesh4Rx(1)
                 .map(new Func1<Response, Mesh>() {
                     @Override
@@ -211,55 +174,59 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                         addPolyline(mesh);
                     }
                 });
-
-//        ApiClient apiClient = new ApiClient() {
-//            @Override
-//            public void onFailure(Call call, IOException e) {
-//                Log.e(TAG, "onFailure", e.fillInStackTrace());
-//            }
-//
-//            @Override
-//            public void onResponse(Call call, Response response) throws IOException {
-//                final String responseCode = response.body().string();
-//                Log.d(TAG, "onPostCompleted: ok");
-//                Log.d(TAG, responseCode);
-//
-//                JSONObject jsonObject = null;
-//                try {
-//                    jsonObject = new JSONObject(responseCode);
-//                } catch (JSONException e) {
-//                    e.printStackTrace();
-//                }
-//
-//                if (jsonObject != null) {
-//                    final JSONObject finalJsonObject = jsonObject;
-//                    handler.post(new Runnable() {
-//                        @Override
-//                        public void run() {
-//                            mLayer = new GeoJsonLayer(mMap, finalJsonObject);
-//
-//                            addPolygons(mLayer);
-//                            mLayer.addLayerToMap();
-//                        }
-//                    });
-//                }
-//            }
-//        };
-//
-//        apiClient.getGeoJson4JSHIS(latlng);
     }
 
-    private static int arvToColor(double ARV) {
-        if (2.0 < ARV) {
-            return 0x44ff0000;
-        } else if (1.8 < ARV) {
-            return 0x44ffff00;
-        } else if (1.6 < ARV) {
-            return 0x4400ff00;
-        } else if (1.2 < ARV) {
-            return 0x440000ff;
+    @Override
+    public boolean onMenuItemClick(MenuItem item) {
+        int id = item.getItemId();
+
+        if (id == R.id.action_select) {
+            setMeshType();
+            return true;
         }
-        return 0;
+
+        return false;
+    }
+
+    private void setMeshType() {
+        final Context context = this;
+        ApiClient apiClient = new ApiClient();
+        apiClient.getCpsMeshType4Rx()
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(new Subscriber<Response>() {
+                    @Override
+                    public void onCompleted() {
+
+                    }
+
+                    @Override
+                    public void onError(Throwable e) {
+                        Log.e(TAG, "onError: ", e.fillInStackTrace());
+                    }
+
+                    @Override
+                    public void onNext(Response response) {
+                        String str = null;
+                        try {
+                            str = response.body().string();
+                            MeshType meshType = new ObjectMapper().readValue(str, MeshType.class);
+                            int[] idList = new int[meshType.getData().size()];
+
+                            int c = 0;
+                            for (MeshType.MeshTypeData data : meshType.getData()) {
+                                SharedPreferencesUtil.putName(data.getId(), data.getName(), context);
+                                SharedPreferencesUtil.putBool(data.getId(), SharedPreferencesUtil.getBool(data.getId(), context), context);
+                                idList[c] = data.getId();
+                                c++;
+                            }
+                            CheckBoxDialog.newInstance(idList).show(getSupportFragmentManager(), CHECK_BOX_DIALOG);
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+
+                    }
+                });
     }
 
     private void addPolyline(Mesh mesh) {
@@ -293,44 +260,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                     .strokeWidth(1.0f);
             mMap.addPolygon(rectOptions);
         }
-    }
-
-    private void addPolygons(GeoJsonLayer layer) {
-        // Iterate over all the features stored in the layer
-        for (GeoJsonFeature feature : layer.getFeatures()) {
-            if (feature.hasProperty("ARV")) {
-                double ARV = Double.parseDouble(feature.getProperty("ARV"));
-
-                GeoJsonPolygonStyle polygonStyle = new GeoJsonPolygonStyle();
-
-                polygonStyle.setFillColor(arvToColor(ARV));
-                polygonStyle.setStrokeWidth(1);
-
-                feature.setPolygonStyle(polygonStyle);
-            }
-        }
-    }
-
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        // Inflate the menu; this adds items to the action bar if it is present.
-//        getMenuInflater().inflate(R.menu.menu_main, menu);
-        return true;
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
-        int id = item.getItemId();
-
-        //noinspection SimplifiableIfStatement
-        if (id == R.id.action_settings) {
-            return true;
-        }
-
-        return super.onOptionsItemSelected(item);
     }
 
     @Override
@@ -375,31 +304,34 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     @Override
     public void onPositiveClick(int[] dataArray, boolean[] boolArray) {
-        final SpinningProgressDialog dialog = SpinningProgressDialog.newInstance(TAG, "loading...");
+        final SpinningProgressDialog dialog = SpinningProgressDialog.newInstance(getString(R.string.app_name), "loading...");
         dialog.show(getSupportFragmentManager(), "dialog_spinner");
 
         List<Observable<Response>> list = new ArrayList<>();
         for (int i = 0; i < dataArray.length; i++) {
             if (boolArray[i]) {
-                Log.d(TAG, "onPositiveClick: data id: " + dataArray[i]);
-                list.add(apiClient.getCpsMesh4Rx(dataArray[i]));
+                ApiClient apiClient = new ApiClient();
+                list.add(apiClient.getCpsMesh4Rx(dataArray[i]).subscribeOn(Schedulers.io()));
             }
         }
 
-        for (Observable<Response> i : list) {
-            Log.d(TAG, "onPositiveClick: for int: " + i);
+        if (list.size() == 0) {
+            dialog.dismiss();
+            mMap.clear();
+            return;
         }
 
         Observable
-                .zip(list, new FuncN<List<Mesh>>() {
+                .combineLatest(list, new FuncN<List<Mesh>>() {
                     @Override
                     public List<Mesh> call(Object... args) {
-                        Log.d(TAG, "call: " + args.length);
+//                        Log.d(TAG, "call: args.length " + args.length);
                         List<Mesh> typeList = new ArrayList<>();
+
                         for (Object obj : args) {
                             Response response = (Response) obj;
                             try {
-                                Log.d(TAG, "call: response " + response.toString());
+//                                Log.d(TAG, "call: response " + response.toString());
                                 String str = response.body().string();
                                 typeList.add(new ObjectMapper().readValue(str, Mesh.class));
                             } catch (IOException e) {
@@ -409,7 +341,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                         return typeList;
                     }
                 })
-                .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(new Subscriber<List<Mesh>>() {
                     @Override
@@ -427,8 +358,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
                     @Override
                     public void onNext(List<Mesh> meshs) {
-                        Log.d(TAG, "onNext: mesh size: " + meshs.size());
-                        Map<String, Mesh.MeshData> meshDataMap = new HashMap<String, Mesh.MeshData>();
+                        Map<String, Mesh.MeshData> meshDataMap = new HashMap<>();
 
                         for (int i = 0; i < meshs.size(); i++) {
                             for (Mesh.MeshData data : meshs.get(i).getData()) {
@@ -452,8 +382,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                         }
                     }
                 });
-
-
     }
 
     @Override

@@ -39,7 +39,7 @@ public class CheckBoxDialog extends DialogFragment {
         }
 
         AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
-        builder.setTitle("select")
+        builder.setTitle("選択してください")
                 .setMultiChoiceItems(nameArray, boolArray, new DialogInterface.OnMultiChoiceClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which, boolean isChecked) {
