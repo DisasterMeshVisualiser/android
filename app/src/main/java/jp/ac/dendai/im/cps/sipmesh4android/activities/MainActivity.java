@@ -105,15 +105,15 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
         mMap.setMyLocationEnabled(true);
-        mMap.setOnMyLocationChangeListener(new GoogleMap.OnMyLocationChangeListener() {
-            @Override
-            public void onMyLocationChange(Location location) {
-                if (mMap != null) {
-                    LatLng current = new LatLng(location.getLatitude(), location.getLongitude());
-                    mMap.animateCamera(CameraUpdateFactory.newLatLng(current));
-                }
-            }
-        });
+//        mMap.setOnMyLocationChangeListener(new GoogleMap.OnMyLocationChangeListener() {
+//            @Override
+//            public void onMyLocationChange(Location location) {
+//                if (mMap != null) {
+//                    LatLng current = new LatLng(location.getLatitude(), location.getLongitude());
+//                    mMap.animateCamera(CameraUpdateFactory.newLatLng(current));
+//                }
+//            }
+//        });
         mMap.getUiSettings().setZoomControlsEnabled(true);
 
         LocationManager locationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
